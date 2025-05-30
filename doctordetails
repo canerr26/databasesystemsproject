@@ -1,0 +1,89 @@
+<?php
+// doctorDetails.php: Show details of a specific doctor
+
+$conn = require_once 'db_connect.php';
+
+if (!isset($_GET['id'])) {
+    header("Location: departments.php");
+    exit;
+}
+
+$doctorId = $_GET['id'];
+
+// Get doctor details
+$sql = "SELECT u.fullName, u.email, u.phone, d.specialty, dp.name AS department_name 
+        FROM user u 
+        JOIN doctor d ON u.userId = d.userId 
+        JOIN department dp ON d.workingIn = dp.departmentId 
+        WHERE u.userId = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $doctorId);
+$stmt->execute();
+$result = $stmt->get_result();
+$doctor = $result->fetch_assoc();
+$stmt->close();
+
+if (!$doctor) {
+    echo "Doctor not found.";
+    exit;
+}
+
+// Get doctor visits
+$sql = "SELECT v.*, u.fullName AS patient_name 
+        FROM visit v 
+        JOIN user u ON v.patientId = u.userId 
+        WHERE v.doctorId = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $doctorId);
+$stmt->execute();
+$visits = $stmt->get_result();
+$stmt->close();
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Doctor Details</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background-color: #f2f2f2; }
+        .nav-links a { margin-right: 15px; }
+    </style>
+</head>
+<body>
+    <div class="nav-links">
+        <a href="home.php">Home</a>
+        <a href="departments.php">Departments</a>
+    </div>
+
+    <h1>Doctor Details</h1>
+    <p><strong>Name:</strong> <?php echo $doctor['fullName']; ?></p>
+    <p><strong>Email:</strong> <?php echo $doctor['email']; ?></p>
+    <p><strong>Phone:</strong> <?php echo $doctor['phone']; ?></p>
+    <p><strong>Specialty:</strong> <?php echo $doctor['specialty']; ?></p>
+    <p><strong>Department:</strong> <?php echo $doctor['department_name']; ?></p>
+
+    <h2>Visit History</h2>
+    <?php if ($visits->num_rows > 0): ?>
+        <table>
+            <tr>
+                <th>Patient</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+            <?php while ($row = $visits->fetch_assoc()): ?>
+                <tr>
+                    <td><?php echo $row['patient_name']; ?></td>
+                    <td><?php echo $row['date']; ?></td>
+                    <td><?php echo $row['status']; ?></td>
+                    <td><a href="visit.php?doctor_id=<?php echo $row['doctorId']; ?>&patient_id=<?php echo $row['patientId']; ?>&date=<?php echo $row['date']; ?>">View Visit</a></td>
+                </tr>
+            <?php endwhile; ?>
+        </table>
+    <?php else: ?>
+        <p>No visits found for this doctor.</p>
+    <?php endif; ?>
+</body>
+</html>
